@@ -12,6 +12,9 @@
 	var $el = angular.element;
 	var isDef = angular.isDefined;
 	var style = (document.body || document.documentElement).style;
+
+	// see http://www.sitepoint.com/css3-animation-javascript-event-handlers/
+	// for CSS Animation events
 	var animationEndSupport = isDef(style.animation) || isDef(style.WebkitAnimation) || isDef(style.MozAnimation) || isDef(style.MsAnimation) || isDef(style.OAnimation);
 	var animationEndEvent = 'animationend webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend';
 
@@ -32,12 +35,14 @@
 
 				var privateMethods = {
 					onDocumentKeyup: function (event) {
+						//  ESC = '27'
 						if (event.keyCode === 27) {
 							publicMethods.close();
 						}
 					},
 
 					closeDialog: function ($dialog) {
+						// remove bound events
 						if (typeof Hammer !== 'undefined') {
 							Hammer($dialog[0]).off('tap', closeByDocumentHandler);
 						} else {
@@ -51,8 +56,14 @@
 						dialogsCount -= 1;
 
 						if (animationEndSupport) {
+							// destory scope whne closing animation finished
 							$dialog.unbind(animationEndEvent).bind(animationEndEvent, function () {
+								// retrieves the scope of the current element then destroy it
+								// each $dialog has a new scope cretaed when $dialog opened
+								// so do not forget to delete the scope object
 								$dialog.scope().$destroy();
+
+								// jqLite method, remove from dom
 								$dialog.remove();
 							}).addClass('ngdialog-closing');
 						} else {
@@ -81,6 +92,7 @@
 					 */
 					open: function (opts) {
 						var self = this;
+						// deep clone then combine the properties
 						var options = angular.copy(defaults);
 
 						opts = opts || {};
@@ -90,6 +102,8 @@
 
 						self.latestID = 'ngdialog' + globalID;
 
+						// always create a new scope from a paased-in scope or $rootScoope
+						// the new scope will prototypically inherit from the parent scope as the scope.$new implementation
 						var scope = angular.isObject(options.scope) ? options.scope.$new() : $rootScope.$new();
 						var $dialog;
 
@@ -102,10 +116,23 @@
 
 							$templateCache.put(options.template, template);
 
+							// add close button
 							if (options.showClose) {
 								template += '<div class="ngdialog-close"></div>';
 							}
 
+				// <div id="ngdialog1" class="ngdialog ngdialog-theme-default ng-scope" ng-controller="InsideCtrl">
+				// 	<div class="ngdialog-overlay"></div>
+				// 	<div class="ngdialog-content">
+				// 		<div class="ngdialog-message">
+				// 			...
+				// 		</div>
+				// 		<div class="ngdialog-buttons">
+				// 			<button type="button" class="ngdialog-button ngdialog-button-secondary" ng-dialog="secondDialogId" ng-dialog-class="ngdialog-theme-default" ng-dialog-controller="SecondModalCtrl" ng-dialog-close-previous="">Close</button>
+				// 			<button type="button" class="ngdialog-button ngdialog-button-primary" ng-click="openSecond()">Open next</button>
+				// 		</div>
+				// 	</div>
+				// </div>
 							self.$result = $dialog = $el('<div id="ngdialog' + globalID + '" class="ngdialog"></div>');
 							$dialog.html('<div class="ngdialog-overlay"></div><div class="ngdialog-content">' + template + '</div>');
 
@@ -117,20 +144,27 @@
 								$dialog.addClass(options.className);
 							}
 
+							//  data could be JS object or is JSON string
+							//  data be adhered to scope as ngDialogData property
 							if (options.data && angular.isString(options.data)) {
 								scope.ngDialogData = options.data.replace(/^\s*/, '')[0] === '{' ? angular.fromJson(options.data) : options.data;
 							}
 
+							// inject closeThisDialog into scope
 							scope.closeThisDialog = function() {
 								privateMethods.closeDialog($dialog);
 							};
 
+							// produce a template function then pass the scope into it
+							// matching the dom elements to directive
 							$timeout(function () {
 								$compile($dialog)(scope);
 							});
 
+							// add $dialog into current dom
 							$body.addClass('ngdialog-open').append($dialog);
 
+							// and binding to global key event
 							if (options.closeByEscape) {
 								$body.bind('keyup', privateMethods.onDocumentKeyup);
 							}
@@ -145,6 +179,7 @@
 									}
 								};
 
+								// $dialog will cover all of the body region
 								if (typeof Hammer !== 'undefined') {
 									Hammer($dialog[0]).on('tap', closeByDocumentHandler);
 								} else {
@@ -168,6 +203,8 @@
 								return tmpl;
 							}
 
+							// return a cached template or a future (wil be auto cached in $cacheFactory)
+							// https://github.com/angular/angular.js/commit/5dc35b527b3c99f6544b8cb52e93c6510d3ac577
 							return $templateCache.get(tmpl) || $http.get(tmpl, { cache: true });
 						}
 					},
@@ -201,6 +238,11 @@
 			}];
 	});
 
+	// directive implementation - convert attributes to options then call the service defined above
+	// ngDialog is an attribute attached to a clickable element
+	// sibling attributes mapping to ngDialog options
+	// 	ngDialogClosePrevious, ngDialogCloseByDocument, ngDialogCloseByKeyup
+	// 	ngDialogClass, ngDialogController, ngDialogScope, ngDialogShowClose
 	module.directive('ngDialog', ['ngDialog', function (ngDialog) {
 		return {
 			restrict: 'A',
@@ -208,6 +250,7 @@
 				elem.on('click', function (e) {
 					e.preventDefault();
 
+					// why not just use isDef?
 					angular.isDefined(attrs.ngDialogClosePrevious) && ngDialog.close(attrs.ngDialogClosePrevious);
 
 					ngDialog.open({

@@ -1,5 +1,7 @@
 # ngDialog
 
+** This fork is in order to personal learning  **
+
 Modal dialogs and popups provider for [Angular.js](http://angularjs.org/) applications.
 
 ngDialog is small (~2Kb), has minimalistic API, highly customizable through themes and has only Angular.js as dependency.
